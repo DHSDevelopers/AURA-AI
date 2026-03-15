@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/59eddaec-3484-4a70-b2c5-f00d9d8ca1bc" width="150">
+</p>
+
+<h1 align="center">Aura AI</h1>
+
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>AURA — by Daniyal</title>
@@ -151,6 +157,9 @@
     .act-btn{width:34px;height:34px;flex-shrink:0;border:none;background:transparent;color:var(--text-3);cursor:pointer;border-radius:9px;display:flex;align-items:center;justify-content:center;transition:all .2s var(--smooth)}
     .act-btn:hover{color:var(--accent);background:rgba(0,212,255,0.08)}
     .act-btn.mic-on{color:#ff4455;background:rgba(255,60,80,0.12);animation:mic-ring 1s ease-in-out infinite}
+    .act-btn.img-mode-on{color:#ff6eb4;background:rgba(255,110,180,0.12)}
+    .send-btn.img-mode{background:linear-gradient(135deg,#ff6eb4,#7b6ff0);box-shadow:0 4px 14px rgba(255,110,180,0.35)}
+    .send-btn.img-mode:hover{box-shadow:0 6px 18px rgba(255,110,180,0.5)}
     @keyframes mic-ring{0%,100%{box-shadow:0 0 0 0 rgba(255,60,80,0.4)}50%{box-shadow:0 0 0 5px rgba(255,60,80,0)}}
     #userInput{flex:1;background:transparent;border:none;outline:none;resize:none;color:var(--text-1);font-family:var(--font-b);font-size:14px;line-height:1.6;max-height:150px;overflow-y:auto;caret-color:var(--accent);padding:3px 0 3px 8px}
     #userInput::placeholder{color:var(--text-3)}
@@ -300,8 +309,12 @@
             <button class="act-btn" id="micBtn" title="Voice input">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             </button>
+            <!-- Image Mode toggle -->
+            <button class="act-btn" id="imgModeBtn" title="Image generation mode">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
             <button class="send-btn" id="sendBtn" aria-label="Send">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <svg id="sendIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
         </div>
@@ -318,7 +331,19 @@
   <script>
     'use strict';
 
-    const GROQ_API_KEY      = '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';
+    /* ================================================================
+       4 Groq keys — auto-rotates silently on rate limit
+    ================================================================ */
+    const GROQ_KEYS = [
+      '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',
+      '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',
+      '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',
+      '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',
+    ];
+    let _keyIndex = 0;
+    function getKey(){ return GROQ_KEYS[_keyIndex]; }
+    const CEREBRAS_KEY  = GROQ_KEYS[0]; // alias
+    const GROQ_API_KEY  = GROQ_KEYS[0]; // alias
     const GROQ_TEXT_MODEL   = 'llama-3.3-70b-versatile';
     const GROQ_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
@@ -357,7 +382,7 @@
       });
     }
 
-    if(GROQ_API_KEY!=='YOUR_GROQ_KEY_HERE'&&GROQ_API_KEY.length>10) document.getElementById('keyBanner').classList.add('hidden');
+    if(GROQ_KEYS[0].length>10) document.getElementById('keyBanner').classList.add('hidden');
 
     /* Clear any bloated localStorage from previous sessions with stored imgUrls */
     try{
@@ -416,6 +441,7 @@
       constructor(){
         this.sessionId=null;this.messages=[];this.isLoading=false;
         this.pendingImgs=[];this.micActive=false;this.recognition=null;
+        this.imgMode=false; // image generation mode
         this.$msgs=document.getElementById('messages');
         this.$input=document.getElementById('userInput');
         this.$send=document.getElementById('sendBtn');
@@ -443,6 +469,7 @@
         this.$attachBtn.addEventListener('click',()=>this.$fileInput.click());
         this.$fileInput.addEventListener('change',e=>{[...e.target.files].forEach(f=>this._addImage(f));e.target.value='';});
         this.$micBtn.addEventListener('click',()=>this._toggleMic());
+        document.getElementById('imgModeBtn').addEventListener('click',()=>this._toggleImgMode());
         const sessions=Store.listSessions();
         if(sessions.length>0){this._loadSession(sessions[0].id);}else{this._newChat();}
         this._renderSidebar();
@@ -485,6 +512,27 @@
       }
       _micOff(){this.micActive=false;this.$micBtn.classList.remove('mic-on');this.$micBtn.title='Voice input';}
 
+      _toggleImgMode(){
+        this.imgMode = !this.imgMode;
+        const btn  = document.getElementById('imgModeBtn');
+        const send = document.getElementById('sendBtn');
+        const icon = document.getElementById('sendIcon');
+        if(this.imgMode){
+          btn.classList.add('img-mode-on');
+          btn.title = 'Image mode ON — click to turn off';
+          send.classList.add('img-mode');
+          this.$input.placeholder = '✦ Describe an image to generate…';
+          /* Swap send icon to sparkle/wand */
+          icon.innerHTML = `<path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z" fill="currentColor" stroke="none"/>`;
+        } else {
+          btn.classList.remove('img-mode-on');
+          btn.title = 'Image generation mode';
+          send.classList.remove('img-mode');
+          this.$input.placeholder = 'Ask anything…';
+          icon.innerHTML = `<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>`;
+        }
+      }
+
       _toggleSidebar(open){this.$sidebar.classList.toggle('open',open);this.$overlay.classList.toggle('show',open);}
 
       _renderSidebar(){
@@ -524,6 +572,8 @@
         if(this.isLoading)return;
         if(!GROQ_API_KEY||GROQ_API_KEY==='YOUR_GROQ_KEY_HERE'){this.toast('⚠️ Add your Groq key first.','error',6000);return;}
         if(text&&!imgs.length&&isImageRequest(text)){this._sendImageGen(text);return;}
+        /* Image mode toggle — treat any text as image prompt */
+        if(this.imgMode&&text&&!imgs.length){this._sendImageGen(text);return;}
 
         const ts=Date.now();
         this.$input.value='';this._resize();
@@ -536,7 +586,6 @@
         const userPrompt=hasImages&&text?text:hasImages?'Describe everything you see in this image in detail.':text;
         const imgUrls=imgs.map(i=>i.dataUrl);
 
-        /* Build API content for vision */
         let apiContent;
         if(hasImages){
           const instruction=text?`${text}\n\nPlease analyze the attached image and follow the instruction above.`:'Describe everything you see in this image in full detail.';
@@ -548,7 +597,6 @@
           apiContent=userPrompt;
         }
 
-        /* Store only text — never base64 in history */
         this.messages.push({role:'user',content:userPrompt,timestamp:ts,imgUrls});
         this._addBubble('user',userPrompt,ts,true,imgUrls);
 
@@ -562,8 +610,6 @@
         try{
           const model=hasImages?GROQ_VISION_MODEL:GROQ_TEXT_MODEL;
 
-          /* Vision: only current message (no history — base64 too large)
-             Text: full history as plain text — AI can remember everything including past image analysis */
           const apiMessages=hasImages
             ?[{role:'user',content:apiContent}]
             :this.messages.map(m=>({
@@ -571,11 +617,10 @@
                 content:typeof m.content==='string'?m.content:Array.isArray(m.content)?(m.content.find(p=>p.type==='text')?.text||''):String(m.content)
               })).filter(m=>m.content.trim());
 
-          /* Build cross-session memory from past sessions */
           const allSessions = Store.listSessions();
           let memoryText = '';
           allSessions.forEach(sess => {
-            if(sess.id === this.sessionId) return; // skip current
+            if(sess.id === this.sessionId) return;
             const msgs = Store.loadMessages(sess.id);
             if(!msgs.length) return;
             const preview = msgs.slice(-4).map(m => {
@@ -586,28 +631,40 @@
             memoryText += `\n[Past chat — ${sess.title}]:\n${preview}\n`;
           });
 
-          const memorySection = memoryText
-            ? `\n\nPREVIOUS CHAT HISTORY (for context and memory):\n${memoryText.slice(0, 3000)}`
-            : '';
-
+          const memorySection = memoryText ? `\n\nPREVIOUS CHAT HISTORY (for context and memory):\n${memoryText.slice(0, 3000)}` : '';
           const systemArr=hasImages?[]:[{role:'system',content:`You are AURA, a helpful and friendly AI assistant made by Daniyal Hasan. You have the ability to analyze images — when a user sends an image, a vision model analyzes it and the result appears in this conversation history. If the user asks follow-up questions about a previously described image, use the analysis already in the conversation to answer. Never say you cannot see images or lack visual capability — refer to the conversation history instead. Use markdown where helpful. Only use code blocks when the user explicitly asks for code. Answer questions directly.${memorySection}`}];
 
-          const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+          /* Both text and vision use Groq — keys rotate silently on 429 */
+          const groqFetch = async (key, body) => fetch('https://api.groq.com/openai/v1/chat/completions',{
             method:'POST',
-            headers:{'Authorization':`Bearer ${GROQ_API_KEY}`,'Content-Type':'application/json'},
-            body:JSON.stringify({
-              model,
-              ...(hasImages?{max_completion_tokens:1024}:{max_tokens:1024}),
-              temperature:0.7,
-              messages:[...systemArr,...apiMessages]
-            })
+            headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+            body:JSON.stringify(body)
           });
 
+          const textBody   = {model:GROQ_TEXT_MODEL,   max_tokens:1024,              temperature:0.7, messages:[...systemArr,...apiMessages]};
+          const visionBody = {model:GROQ_VISION_MODEL, max_completion_tokens:1024,   temperature:0.7, messages:[...apiMessages]};
+          const body = hasImages ? visionBody : textBody;
+
+          let res = await groqFetch(getKey(), body);
+
+          /* Silent key rotation on 429 */
+          if(res.status === 429){
+            for(let i = 1; i < GROQ_KEYS.length; i++){
+              _keyIndex = i;
+              res = await groqFetch(getKey(), body);
+              if(res.status !== 429) break;
+            }
+            if(res.status === 429){
+              /* All exhausted — wait 15s silently then reset */
+              await new Promise(r => setTimeout(r, 15000));
+              _keyIndex = 0;
+              res = await groqFetch(getKey(), body);
+            }
+          }
           if(!res.ok){
             const e=await res.json().catch(()=>({}));
             console.error('[AURA]',res.status,JSON.stringify(e));
             if(res.status===401)throw new Error('Invalid API key.');
-            if(res.status===429)throw new Error('Rate limit. Wait a moment.');
             throw new Error(e?.error?.message||`Error ${res.status}`);
           }
 
@@ -618,7 +675,7 @@
           typing.remove();
           const ats=Date.now();
           this.messages.push({role:'assistant',content:reply,timestamp:ats});
-          this._addBubble('assistant',reply,ats,false,null);
+          this._addBubble('assistant',reply,ats,true,null);
           Store.updateMeta(this.sessionId,{msgCount:this.messages.length,ts:Date.now()});
           this._saveMessages();this._renderSidebar();
 
@@ -693,7 +750,7 @@
         av.innerHTML=isAI?`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z"/></svg>`:'D';
         const bub=document.createElement('div');bub.className='bubble '+(isAI?'bubble-ai':'bubble-user');
         if(isAI){
-          bub.innerHTML=''; /* filled below after actions are ready */
+          bub.innerHTML='';
         }else{
           let html='';
           if(imgUrls&&imgUrls.length)html+=`<div class="bubble-imgs">${imgUrls.map(u=>`<img class="bubble-img" src="${u}" alt="image"/>`).join('')}</div>`;
@@ -703,11 +760,8 @@
         }
         const timeEl=document.createElement('span');timeEl.className='msg-time';timeEl.textContent=time;
 
-        /* ── AI action buttons: Listen · Regenerate · Copy ── */
         if(isAI && content){
           const actions=document.createElement('div');actions.className='bubble-actions';
-
-          /* 🔊 Listen — uses Google neural voice via ResponsiveVoice */
           const listenBtn=document.createElement('button');listenBtn.className='bub-act';
           const listenIcon=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
           const stopIcon=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
@@ -716,103 +770,57 @@
           listenBtn.addEventListener('click',()=>{
             const plain=content.replace(/#{1,6}\s/g,'').replace(/[*_`~>]/g,'').replace(/\n+/g,' ').trim();
             if(isSpeaking){
-              /* Stop */
               if(window.responsiveVoice) window.responsiveVoice.cancel();
               else window.speechSynthesis.cancel();
-              isSpeaking=false;
-              listenBtn.classList.remove('listening');
-              listenBtn.innerHTML=`${listenIcon} Listen`;
-              return;
+              isSpeaking=false;listenBtn.classList.remove('listening');listenBtn.innerHTML=`${listenIcon} Listen`;return;
             }
-            /* Start */
-            isSpeaking=true;
-            listenBtn.classList.add('listening');
-            listenBtn.innerHTML=`${stopIcon} Stop`;
-            const onEnd=()=>{ isSpeaking=false; listenBtn.classList.remove('listening'); listenBtn.innerHTML=`${listenIcon} Listen`; };
-            if(window.responsiveVoice && window.responsiveVoice.voiceSupport()){
-              /* ResponsiveVoice — Google UK English Female sounds closest to Gemini */
-              window.responsiveVoice.speak(plain, 'Google UK English Female', {
-                rate: 0.95, pitch: 1, volume: 1,
-                onend: onEnd, onerror: onEnd
-              });
-            } else {
-              /* Fallback to best browser voice */
-              const utt=new SpeechSynthesisUtterance(plain);
-              utt.rate=0.95; utt.pitch=1.05; utt.volume=1;
-              const vs=window.speechSynthesis.getVoices();
-              const pick=['Google UK English Female','Samantha','Karen','Google US English'];
-              for(const n of pick){ const v=vs.find(x=>x.name.includes(n)); if(v){utt.voice=v;break;} }
-              utt.onend=onEnd; utt.onerror=onEnd;
-              window.speechSynthesis.speak(utt);
+            isSpeaking=true;listenBtn.classList.add('listening');listenBtn.innerHTML=`${stopIcon} Stop`;
+            const onEnd=()=>{isSpeaking=false;listenBtn.classList.remove('listening');listenBtn.innerHTML=`${listenIcon} Listen`;};
+            if(window.responsiveVoice&&window.responsiveVoice.voiceSupport()){
+              window.responsiveVoice.speak(plain,'Google UK English Female',{rate:0.95,pitch:1,volume:1,onend:onEnd,onerror:onEnd});
+            }else{
+              const utt=new SpeechSynthesisUtterance(plain);utt.rate=0.95;utt.pitch=1.05;utt.volume=1;
+              const vs=window.speechSynthesis.getVoices();const pick=['Google UK English Female','Samantha','Karen','Google US English'];
+              for(const n of pick){const v=vs.find(x=>x.name.includes(n));if(v){utt.voice=v;break;}}
+              utt.onend=onEnd;utt.onerror=onEnd;window.speechSynthesis.speak(utt);
             }
           });
-
-          /* 🔄 Regenerate */
           const regenBtn=document.createElement('button');regenBtn.className='bub-act';
           regenBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> Regenerate`;
-          regenBtn.addEventListener('click',async ()=>{
+          regenBtn.addEventListener('click',async()=>{
             if(this.isLoading)return;
-            /* Find last user message */
-            const lastUser=this.messages.slice().reverse().find(m=>m.role==='user');
-            if(!lastUser)return;
-            /* Remove last AI message from array and DOM */
-            const lastIdx=this.messages.lastIndexOf(this.messages.slice().reverse().find(m=>m.role==='assistant'));
-            this.messages.splice(this.messages.length - this.messages.slice().reverse().findIndex(m=>m.role==='assistant') - 1, 1);
-            wrap.remove();
-            /* Re-send */
-            this.$input.value=lastUser.content||'';
-            this._send();
+            const lastUser=this.messages.slice().reverse().find(m=>m.role==='user');if(!lastUser)return;
+            this.messages.splice(this.messages.length-this.messages.slice().reverse().findIndex(m=>m.role==='assistant')-1,1);
+            wrap.remove();this.$input.value=lastUser.content||'';this._send();
           });
-
-          /* 📋 Copy */
           const copyBtn=document.createElement('button');copyBtn.className='bub-act';
           copyBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`;
           copyBtn.addEventListener('click',()=>{
             navigator.clipboard.writeText(content).then(()=>{
               copyBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
-              setTimeout(()=>{ copyBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`; },2000);
+              setTimeout(()=>{copyBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`;},2000);
             });
           });
-
-          actions.appendChild(listenBtn);
-          actions.appendChild(regenBtn);
-          actions.appendChild(copyBtn);
+          actions.appendChild(listenBtn);actions.appendChild(regenBtn);actions.appendChild(copyBtn);
           bub.appendChild(actions);
         }
 
-        /* ── Typewriter effect for new AI messages ── */
-        if(isAI && animate && content){
-          const words = content.split(' ');
-          let i = 0;
-          const cursor = document.createElement('span');
-          cursor.style.cssText = 'display:inline-block;width:2px;height:0.85em;background:var(--accent);margin-left:1px;vertical-align:middle;border-radius:1px;animation:blink .6s ease-in-out infinite';
-          const textNode = document.createElement('span');
-          /* Save actions ref BEFORE inserting text nodes */
-          const actionsRef = bub.querySelector('.bubble-actions');
-          bub.insertBefore(textNode, bub.firstChild);
-          bub.insertBefore(cursor, textNode.nextSibling);
-          const type = () => {
-            if(i < words.length){
-              textNode.textContent += (i === 0 ? '' : ' ') + words[i];
-              i++;
-              setTimeout(type, 16 + Math.random() * 12);
-            } else {
-              cursor.remove();
-              bub.innerHTML = MD.parse(content);
-              bub.appendChild(timeEl);
-              if(actionsRef) bub.appendChild(actionsRef);
-            }
+        if(isAI&&animate&&content){
+          const words=content.split(' ');let i=0;
+          const cursor=document.createElement('span');
+          cursor.style.cssText='display:inline-block;width:2px;height:0.85em;background:var(--accent);margin-left:1px;vertical-align:middle;border-radius:1px;animation:blink .6s ease-in-out infinite';
+          const textNode=document.createElement('span');
+          const actionsRef=bub.querySelector('.bubble-actions');
+          bub.insertBefore(textNode,bub.firstChild);bub.insertBefore(cursor,textNode.nextSibling);
+          const type=()=>{
+            if(i<words.length){textNode.textContent+=(i===0?'':' ')+words[i];i++;setTimeout(type,16+Math.random()*12);}
+            else{cursor.remove();bub.innerHTML=MD.parse(content);bub.appendChild(timeEl);if(actionsRef)bub.appendChild(actionsRef);}
           };
           type();
-        } else if(isAI){
-          /* Save actions before wiping */
-          const actionsRef = bub.querySelector('.bubble-actions');
-          bub.innerHTML = MD.parse(content);
-          bub.appendChild(timeEl);
-          if(actionsRef) bub.appendChild(actionsRef);
-        } else {
-          bub.appendChild(timeEl);
-        }
+        }else if(isAI){
+          const actionsRef=bub.querySelector('.bubble-actions');
+          bub.innerHTML=MD.parse(content);bub.appendChild(timeEl);if(actionsRef)bub.appendChild(actionsRef);
+        }else{bub.appendChild(timeEl);}
 
         wrap.appendChild(av);wrap.appendChild(bub);this.$msgs.appendChild(wrap);
         if(isAI){requestAnimationFrame(()=>wrap.scrollIntoView({behavior:'smooth',block:'start'}));}
@@ -848,12 +856,8 @@
       }
 
       _saveMessages(){
-        /* Strip imgUrls before saving — base64 dataUrls bloat localStorage fast */
-        const clean = this.messages.map(m => {
-          const {imgUrls, ...rest} = m;
-          return rest;
-        });
-        Store.saveMessages(this.sessionId, clean);
+        const clean=this.messages.map(m=>{const{imgUrls,...rest}=m;return rest;});
+        Store.saveMessages(this.sessionId,clean);
       }
       _esc(s){return MD.esc(String(s));}
       _resize(){const e=this.$input;e.style.height='auto';e.style.height=e.scrollHeight+'px';}
@@ -869,3 +873,4 @@
   </script>
 </body>
 </html>
+
