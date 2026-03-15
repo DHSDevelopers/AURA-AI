@@ -100,6 +100,11 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .bubble{max-width:min(70%,520px);padding:11px 15px;border-radius:var(--r-lg);position:relative;line-height:1.65;font-size:14px;word-wrap:break-word}
     .bubble-ai{background:var(--bg-surface);border:1px solid var(--glass-border);border-bottom-left-radius:var(--r-sm);backdrop-filter:var(--blur-g);-webkit-backdrop-filter:var(--blur-g);color:var(--text-1);box-shadow:inset 0 1px 0 var(--glass-shine),0 4px 18px rgba(0,0,0,0.22)}
+    /* AI action buttons */
+    .bubble-actions{display:flex;gap:4px;margin-top:8px;align-items:center}
+    .bub-act{border:none;background:none;color:var(--text-3);cursor:pointer;padding:4px 7px;border-radius:6px;font-size:10px;font-family:var(--font-b);display:flex;align-items:center;gap:4px;transition:all .15s}
+    .bub-act:hover{color:var(--accent);background:rgba(0,212,255,0.08)}
+    .bub-act.listening{color:#ff4455;background:rgba(255,60,80,0.1);animation:mic-ring 1s ease infinite}
     .bubble-user{background:var(--grad-msg);border:1px solid rgba(0,212,255,0.14);border-bottom-right-radius:var(--r-sm);backdrop-filter:var(--blur-g);-webkit-backdrop-filter:var(--blur-g);color:var(--text-1);max-height:200px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,0.2) transparent}
     .msg-time{display:block;font-size:9.5px;color:var(--text-3);margin-top:5px}
     .message.user .msg-time{text-align:right}
@@ -179,6 +184,7 @@
     .btn-danger{background:rgba(255,60,90,0.12);border-color:rgba(255,60,90,0.24);color:rgba(255,130,150,0.95)}.btn-danger:hover{background:rgba(255,60,90,0.22)}
     @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
     .msg-appear{animation:fadeUp .3s var(--out) both}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
     #splash{position:fixed;inset:0;z-index:9999;background:var(--bg-void);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;pointer-events:none}
     #splash.hide{animation:splashOut .6s var(--smooth) forwards}
     @keyframes splashOut{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.04)}}
@@ -210,6 +216,7 @@
     }
   </style>
   <script src="https://js.puter.com/v2/"></script>
+  <script src="https://code.responsivevoice.org/responsivevoice.js?key=FREE"></script>
 </head>
 <body>
   <div id="splash">
@@ -686,7 +693,7 @@
         av.innerHTML=isAI?`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z"/></svg>`:'D';
         const bub=document.createElement('div');bub.className='bubble '+(isAI?'bubble-ai':'bubble-user');
         if(isAI){
-          bub.innerHTML=MD.parse(content);
+          bub.innerHTML=''; /* filled below after actions are ready */
         }else{
           let html='';
           if(imgUrls&&imgUrls.length)html+=`<div class="bubble-imgs">${imgUrls.map(u=>`<img class="bubble-img" src="${u}" alt="image"/>`).join('')}</div>`;
@@ -695,7 +702,119 @@
           bub.querySelectorAll('.bubble-img').forEach(img=>img.addEventListener('click',()=>openLightbox(img.src)));
         }
         const timeEl=document.createElement('span');timeEl.className='msg-time';timeEl.textContent=time;
-        bub.appendChild(timeEl);wrap.appendChild(av);wrap.appendChild(bub);this.$msgs.appendChild(wrap);
+
+        /* ── AI action buttons: Listen · Regenerate · Copy ── */
+        if(isAI && content){
+          const actions=document.createElement('div');actions.className='bubble-actions';
+
+          /* 🔊 Listen — uses Google neural voice via ResponsiveVoice */
+          const listenBtn=document.createElement('button');listenBtn.className='bub-act';
+          const listenIcon=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+          const stopIcon=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`;
+          listenBtn.innerHTML=`${listenIcon} Listen`;
+          let isSpeaking=false;
+          listenBtn.addEventListener('click',()=>{
+            const plain=content.replace(/#{1,6}\s/g,'').replace(/[*_`~>]/g,'').replace(/\n+/g,' ').trim();
+            if(isSpeaking){
+              /* Stop */
+              if(window.responsiveVoice) window.responsiveVoice.cancel();
+              else window.speechSynthesis.cancel();
+              isSpeaking=false;
+              listenBtn.classList.remove('listening');
+              listenBtn.innerHTML=`${listenIcon} Listen`;
+              return;
+            }
+            /* Start */
+            isSpeaking=true;
+            listenBtn.classList.add('listening');
+            listenBtn.innerHTML=`${stopIcon} Stop`;
+            const onEnd=()=>{ isSpeaking=false; listenBtn.classList.remove('listening'); listenBtn.innerHTML=`${listenIcon} Listen`; };
+            if(window.responsiveVoice && window.responsiveVoice.voiceSupport()){
+              /* ResponsiveVoice — Google UK English Female sounds closest to Gemini */
+              window.responsiveVoice.speak(plain, 'Google UK English Female', {
+                rate: 0.95, pitch: 1, volume: 1,
+                onend: onEnd, onerror: onEnd
+              });
+            } else {
+              /* Fallback to best browser voice */
+              const utt=new SpeechSynthesisUtterance(plain);
+              utt.rate=0.95; utt.pitch=1.05; utt.volume=1;
+              const vs=window.speechSynthesis.getVoices();
+              const pick=['Google UK English Female','Samantha','Karen','Google US English'];
+              for(const n of pick){ const v=vs.find(x=>x.name.includes(n)); if(v){utt.voice=v;break;} }
+              utt.onend=onEnd; utt.onerror=onEnd;
+              window.speechSynthesis.speak(utt);
+            }
+          });
+
+          /* 🔄 Regenerate */
+          const regenBtn=document.createElement('button');regenBtn.className='bub-act';
+          regenBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> Regenerate`;
+          regenBtn.addEventListener('click',async ()=>{
+            if(this.isLoading)return;
+            /* Find last user message */
+            const lastUser=this.messages.slice().reverse().find(m=>m.role==='user');
+            if(!lastUser)return;
+            /* Remove last AI message from array and DOM */
+            const lastIdx=this.messages.lastIndexOf(this.messages.slice().reverse().find(m=>m.role==='assistant'));
+            this.messages.splice(this.messages.length - this.messages.slice().reverse().findIndex(m=>m.role==='assistant') - 1, 1);
+            wrap.remove();
+            /* Re-send */
+            this.$input.value=lastUser.content||'';
+            this._send();
+          });
+
+          /* 📋 Copy */
+          const copyBtn=document.createElement('button');copyBtn.className='bub-act';
+          copyBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`;
+          copyBtn.addEventListener('click',()=>{
+            navigator.clipboard.writeText(content).then(()=>{
+              copyBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+              setTimeout(()=>{ copyBtn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`; },2000);
+            });
+          });
+
+          actions.appendChild(listenBtn);
+          actions.appendChild(regenBtn);
+          actions.appendChild(copyBtn);
+          bub.appendChild(actions);
+        }
+
+        /* ── Typewriter effect for new AI messages ── */
+        if(isAI && animate && content){
+          const words = content.split(' ');
+          let i = 0;
+          const cursor = document.createElement('span');
+          cursor.style.cssText = 'display:inline-block;width:2px;height:0.85em;background:var(--accent);margin-left:1px;vertical-align:middle;border-radius:1px;animation:blink .6s ease-in-out infinite';
+          const textNode = document.createElement('span');
+          /* Save actions ref BEFORE inserting text nodes */
+          const actionsRef = bub.querySelector('.bubble-actions');
+          bub.insertBefore(textNode, bub.firstChild);
+          bub.insertBefore(cursor, textNode.nextSibling);
+          const type = () => {
+            if(i < words.length){
+              textNode.textContent += (i === 0 ? '' : ' ') + words[i];
+              i++;
+              setTimeout(type, 16 + Math.random() * 12);
+            } else {
+              cursor.remove();
+              bub.innerHTML = MD.parse(content);
+              bub.appendChild(timeEl);
+              if(actionsRef) bub.appendChild(actionsRef);
+            }
+          };
+          type();
+        } else if(isAI){
+          /* Save actions before wiping */
+          const actionsRef = bub.querySelector('.bubble-actions');
+          bub.innerHTML = MD.parse(content);
+          bub.appendChild(timeEl);
+          if(actionsRef) bub.appendChild(actionsRef);
+        } else {
+          bub.appendChild(timeEl);
+        }
+
+        wrap.appendChild(av);wrap.appendChild(bub);this.$msgs.appendChild(wrap);
         if(isAI){requestAnimationFrame(()=>wrap.scrollIntoView({behavior:'smooth',block:'start'}));}
         else{this._scroll(true);}
       }
