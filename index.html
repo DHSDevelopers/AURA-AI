@@ -703,7 +703,7 @@
         timeEl.textContent=new Date(ats).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
         const genWrap=document.createElement('div');genWrap.className='gen-img-wrap';
         const loader=document.createElement('div');loader.className='gen-img-loading';
-        loader.innerHTML=`<div class="gen-img-spinner"></div><span>Generating…<br><small style="opacity:.6;font-size:10px">Sign in to Puter if a popup appears</small></span>`;
+        loader.innerHTML=`<div class="gen-img-spinner"></div><span>Generating…<br><small style="opacity:.6;font-size:10px">Sign in to Puter if a popup appears</small></span><button id="stopGenBtn" style="margin-top:6px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,60,80,0.4);background:rgba(255,60,80,0.1);color:rgba(255,130,150,0.9);font-size:11px;cursor:pointer;font-family:var(--font-b)">✕ Stop</button>`;
         const caption=document.createElement('div');caption.className='gen-img-prompt';
         caption.textContent='✦ '+imgPrompt;
         genWrap.appendChild(loader);genWrap.appendChild(caption);
@@ -711,8 +711,18 @@
         wrap.appendChild(av);wrap.appendChild(bub);this.$msgs.appendChild(wrap);
         requestAnimationFrame(()=>wrap.scrollIntoView({behavior:'smooth',block:'start'}));
         this._setLoading(true);
+
+        let cancelled=false;
+        loader.querySelector('#stopGenBtn').addEventListener('click',()=>{
+          cancelled=true;
+          loader.innerHTML=`<p style="color:var(--text-3);font-size:12px;padding:4px">Generation stopped.</p>`;
+          this._setLoading(false);
+          if(window.innerWidth>=768)this.$input.focus();
+        });
+
         try{
           const imgEl=await puter.ai.txt2img(imgPrompt);
+          if(cancelled)return;
           imgEl.className='gen-img';imgEl.style.cursor='pointer';
           imgEl.addEventListener('click',()=>openLightbox(imgEl.src));
           loader.remove();genWrap.insertBefore(imgEl,caption);
@@ -720,6 +730,7 @@
           Store.updateMeta(this.sessionId,{msgCount:this.messages.length,ts:Date.now()});
           this._saveMessages();this._renderSidebar();
         }catch(err){
+          if(cancelled)return;
           loader.innerHTML=`<p style="color:rgba(255,130,150,0.9);font-size:13px;padding:8px">⚠️ ${this._esc(err.message||'Generation failed.')}</p>`;
           console.error('[AURA IMG]',err);
         }finally{
