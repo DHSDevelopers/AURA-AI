@@ -722,6 +722,32 @@
       _scroll(s=true){requestAnimationFrame(()=>this.$msgs.scrollTo({top:this.$msgs.scrollHeight,behavior:s?'smooth':'instant'}));}
     }
 
+  
+  (function() {
+    var ua = navigator.userAgent || navigator.vendor || window.opera;
+    var isInstagram = (ua.indexOf('Instagram') > -1) || (ua.indexOf('FBAN') > -1) || (ua.indexOf('FBAV') > -1);
+
+    if (isInstagram) {
+      // 1. Try Android Chrome Force
+      var androidIntent = "intent://dhsdevelopers.github.io/AURA-AI/#Intent;scheme=https;package=com.android.chrome;end";
+      
+      // 2. Try iOS Chrome Force (if they have Chrome installed)
+      var iosChrome = "googlechromes://dhsdevelopers.github.io/AURA-AI/";
+
+      if (/Android/i.test(ua)) {
+        window.location.href = androidIntent;
+      } else if (/iPhone|iPad|iPod/i.test(ua)) {
+        // iOS is stricter; we show a prompt or try the chrome protocol
+        window.location.href = iosChrome;
+        
+        // Fallback: If it doesn't jump in 1 second, tell them how to do it
+        setTimeout(function() {
+          alert("For the best experience with AURA AI, please tap the three dots (⋮) and select 'Open in System Browser'.");
+        }, 1000);
+      }
+    }
+  })();
+
     document.addEventListener('DOMContentLoaded',()=>{
       const splash=document.getElementById('splash');
       setTimeout(()=>{splash.classList.add('hide');splash.addEventListener('animationend',()=>{splash.style.display='none';},{once:true});},2200);
