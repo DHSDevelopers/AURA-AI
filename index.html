@@ -564,7 +564,26 @@
                 content:typeof m.content==='string'?m.content:Array.isArray(m.content)?(m.content.find(p=>p.type==='text')?.text||''):String(m.content)
               })).filter(m=>m.content.trim());
 
-          const systemArr=hasImages?[]:[{role:'system',content:'You are AURA, a helpful and friendly AI assistant made by Daniyal Hasan. Use markdown where helpful. Only use code blocks when the user explicitly asks for code. Answer questions directly.'}];
+          /* Build cross-session memory from past sessions */
+          const allSessions = Store.listSessions();
+          let memoryText = '';
+          allSessions.forEach(sess => {
+            if(sess.id === this.sessionId) return; // skip current
+            const msgs = Store.loadMessages(sess.id);
+            if(!msgs.length) return;
+            const preview = msgs.slice(-4).map(m => {
+              const role = m.role === 'user' ? 'User' : 'AURA';
+              const content = typeof m.content === 'string' ? m.content : (m.content?.find?.(p=>p.type==='text')?.text || '');
+              return `${role}: ${content.slice(0,200)}`;
+            }).join('\n');
+            memoryText += `\n[Past chat — ${sess.title}]:\n${preview}\n`;
+          });
+
+          const memorySection = memoryText
+            ? `\n\nPREVIOUS CHAT HISTORY (for context and memory):\n${memoryText.slice(0, 3000)}`
+            : '';
+
+          const systemArr=hasImages?[]:[{role:'system',content:`You are AURA, a helpful and friendly AI assistant made by Daniyal Hasan. You have the ability to analyze images — when a user sends an image, a vision model analyzes it and the result appears in this conversation history. If the user asks follow-up questions about a previously described image, use the analysis already in the conversation to answer. Never say you cannot see images or lack visual capability — refer to the conversation history instead. Use markdown where helpful. Only use code blocks when the user explicitly asks for code. Answer questions directly.${memorySection}`}];
 
           const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
             method:'POST',
