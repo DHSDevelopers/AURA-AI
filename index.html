@@ -555,10 +555,11 @@
         try{
           const model=hasImages?GROQ_VISION_MODEL:GROQ_TEXT_MODEL;
 
-          /* Vision: only current message. Text: last 6 messages plain text */
+          /* Vision: only current message (no history — base64 too large)
+             Text: full history as plain text — AI can remember everything including past image analysis */
           const apiMessages=hasImages
             ?[{role:'user',content:apiContent}]
-            :this.messages.slice(-6).map(m=>({
+            :this.messages.map(m=>({
                 role:m.role,
                 content:typeof m.content==='string'?m.content:Array.isArray(m.content)?(m.content.find(p=>p.type==='text')?.text||''):String(m.content)
               })).filter(m=>m.content.trim());
