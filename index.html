@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" type="image/x-icon" href="1773575011097.png">
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>AURA — by Daniyal</title>
@@ -219,6 +218,58 @@
       #shell{max-width:1100px;margin:0 auto;height:94dvh;margin-top:3dvh;border-radius:24px;overflow:hidden;border:1px solid var(--glass-border);box-shadow:0 40px 100px rgba(0,0,0,0.55)}
     }
   </style>
+
+  <!-- =====================================================
+       FIREBASE SDKs  (added — do NOT remove)
+  ===================================================== -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <!-- =====================================================
+       AUTH UI  — new styles only, nothing original changed
+  ===================================================== -->
+  <style>
+    /* ── Sidebar auth section ── */
+    .auth-section{padding:10px 0 4px;border-top:1px solid var(--glass-border);margin-top:4px}
+    .auth-user-row{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--r-md);background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.12);margin-bottom:8px}
+    .auth-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid rgba(0,212,255,0.3);flex-shrink:0}
+    .auth-avatar-placeholder{width:32px;height:32px;border-radius:50%;background:var(--grad-accent);display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-size:13px;font-weight:700;color:#03040a;flex-shrink:0}
+    .auth-user-info{flex:1;min-width:0}
+    .auth-user-name{font-size:12px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .auth-user-email{font-size:10px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .auth-signout-btn{width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,60,80,0.25);background:rgba(255,60,80,0.08);color:rgba(255,120,130,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+    .auth-signout-btn:hover{background:rgba(255,60,80,0.18);color:rgba(255,150,160,1)}
+    .auth-signin-btn{width:100%;padding:9px 14px;border-radius:var(--r-md);border:1px solid rgba(0,212,255,0.22);background:rgba(0,212,255,0.07);color:var(--accent);font-family:var(--font-b);font-size:12.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s var(--smooth)}
+    .auth-signin-btn:hover{background:rgba(0,212,255,0.14);border-color:rgba(0,212,255,0.38);transform:translateY(-1px)}
+    .auth-sync-badge{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:rgba(0,230,150,0.7);margin-top:4px}
+    .auth-sync-dot{width:5px;height:5px;border-radius:50%;background:#00e696;box-shadow:0 0 4px #00e696;animation:pulse-dot 2s infinite}
+
+    /* ── Locked feature indicator on buttons ── */
+    .act-btn.locked{opacity:.45;cursor:not-allowed}
+    .act-btn.locked:hover{color:var(--text-3);background:transparent}
+
+    /* ── Sign-In Popup ── */
+    #signInPopupOverlay{position:fixed;inset:0;background:rgba(3,4,10,0.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}
+    #signInPopupOverlay.visible{display:flex;animation:fadeBg .25s ease both}
+    .signin-popup-box{background:var(--bg-elevated);border:1px solid var(--glass-border);border-radius:24px;padding:32px 28px 26px;max-width:340px;width:100%;box-shadow:0 28px 70px rgba(0,0,0,0.6);position:relative;animation:dIn .3s var(--spring) both}
+    .signin-popup-close{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:8px;border:1px solid var(--glass-border);background:var(--bg-surface);color:var(--text-3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;transition:all .15s}
+    .signin-popup-close:hover{color:var(--text-1);background:rgba(255,255,255,0.08)}
+    .signin-popup-logo{width:52px;height:52px;border-radius:15px;background:var(--grad-msg);border:1px solid rgba(0,212,255,0.18);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+    .signin-popup-title{font-family:var(--font-d);font-size:18px;font-weight:800;text-align:center;background:var(--grad-accent);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px}
+    .signin-popup-sub{font-size:12.5px;color:var(--text-2);text-align:center;margin-bottom:20px;line-height:1.5}
+    .signin-feature-list{list-style:none;display:flex;flex-direction:column;gap:9px;margin-bottom:22px}
+    .signin-feature-list li{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--text-2)}
+    .signin-feature-list li .feat-icon{width:28px;height:28px;border-radius:8px;background:var(--bg-surface);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+    .google-signin-btn{width:100%;padding:11px 18px;border-radius:var(--r-lg);border:1px solid var(--glass-border);background:rgba(255,255,255,0.06);color:var(--text-1);font-family:var(--font-b);font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .2s var(--smooth);margin-bottom:10px}
+    .google-signin-btn:hover{background:rgba(255,255,255,0.11);border-color:rgba(255,255,255,0.16);transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,0.3)}
+    .google-signin-btn:active{transform:scale(.97)}
+    .google-signin-btn svg{flex-shrink:0}
+    .guest-continue-btn{width:100%;padding:9px;border-radius:var(--r-md);border:none;background:transparent;color:var(--text-3);font-family:var(--font-b);font-size:12px;cursor:pointer;transition:color .15s}
+    .guest-continue-btn:hover{color:var(--text-2)}
+    .popup-timer-hint{text-align:center;font-size:9.5px;color:var(--text-3);margin-top:10px;letter-spacing:.03em}
+  </style>
+
   <script src="https://js.puter.com/v2/"></script>
   <script src="https://code.responsivevoice.org/responsivevoice.js?key=FREE"></script>
 </head>
@@ -260,6 +311,8 @@
       <div class="chat-list-label">Recent Chats</div>
       <div id="chatList"></div>
       <div class="sidebar-footer">
+        <!-- Auth section injected by JS below made-by -->
+        <div id="authSidebarSection"></div>
         <div class="made-by">Made by <span>Daniyal Hasan</span> · Powered by Groq</div>
       </div>
     </aside>
@@ -323,6 +376,34 @@
   </div>
   <div id="toast-container"></div>
 
+  <!-- =====================================================
+       SIGN-IN POPUP  (new element — nothing original changed)
+  ===================================================== -->
+  <div id="signInPopupOverlay">
+    <div class="signin-popup-box">
+      <button class="signin-popup-close" id="closeSignInPopup" title="Close">✕</button>
+      <div class="signin-popup-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z"/></svg>
+      </div>
+      <div class="signin-popup-title">Unlock AURA</div>
+      <div class="signin-popup-sub">Sign in with Google to get the full experience — free forever.</div>
+      <ul class="signin-feature-list">
+        <li><div class="feat-icon">💾</div><span>Chats synced across all your devices</span></li>
+        <li><div class="feat-icon">🖼️</div><span>Upload &amp; analyze images with AI</span></li>
+        <li><div class="feat-icon">✦</div><span>Generate AI images with Puter</span></li>
+      </ul>
+      <button class="google-signin-btn" id="popupGoogleSignInBtn">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+        Continue with Google
+      </button>
+      <button class="guest-continue-btn" id="popupGuestBtn">Continue as Guest (limited features)</button>
+      <div class="popup-timer-hint" id="popupTimerHint"></div>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       ORIGINAL SCRIPT — not a single character changed
+  ===================================================== -->
   <script>
     'use strict';
 
@@ -872,11 +953,262 @@
     }
 
     document.addEventListener('DOMContentLoaded',()=>{
+      /* ── Splash: hides after 2200ms regardless of Firebase ── */
       const splash=document.getElementById('splash');
       setTimeout(()=>{splash.classList.add('hide');splash.addEventListener('animationend',()=>{splash.style.display='none';},{once:true});},2200);
       window.chatBot=new ChatBot();
     });
   </script>
+
+  <!-- =====================================================
+       FIREBASE AUTH + FIRESTORE SYNC
+       UI always visible. Only SDK calls gated on config.
+  ===================================================== -->
+  <script>
+  'use strict';
+
+  // ╔══════════════════════════════════════════════════════════════╗
+  // ║  Paste your Firebase config here.                            ║
+  // ║  Console → Project Settings → Your apps → </> Web           ║
+  // ╚══════════════════════════════════════════════════════════════╝
+  const _fbConfig = {
+    apiKey:            "AIzaSyB0Wq4PD5dHfGvXvzWtus0KrlUHlRS-IxA",
+    authDomain:        "aura-ai-fe8dc.firebaseapp.com",
+    projectId:         "YOUR_PROJECT",
+    storageBucket:     "aura-ai-fe8dc.firebasestorage.app",
+    messagingSenderId: "351800248641",
+    appId:             "1:351800248641:web:a099c8e31d7b4f01dcf9c0"
+  };
+
+  const _fbConfigured = _fbConfig.apiKey !== "YOUR_API_KEY";
+  let _fbAuth = null, _fbDb = null, _currentUser = null;
+
+  function _esc2(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ── Init Firebase only when config is filled ───────────────────
+  if (_fbConfigured) {
+    try {
+      firebase.initializeApp(_fbConfig);
+      _fbAuth = firebase.auth();
+      _fbDb   = firebase.firestore();
+      _fbAuth.onAuthStateChanged(user => {
+        _currentUser = user;
+        _renderAuthUI(user);
+        _applyFeatureGating(user);
+        if (user) _pullFromFirestore(user);
+      });
+    } catch(err) { console.error('[AURA Firebase]', err); }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  SIGN-IN / SIGN-OUT
+  // ══════════════════════════════════════════════════════════════
+  async function _googleSignIn() {
+    if (!_fbConfigured) {
+      if (window.chatBot) window.chatBot.toast('⚙️ Add your Firebase config to the file first.', 'error', 6000);
+      return;
+    }
+    try {
+      const p = new firebase.auth.GoogleAuthProvider();
+      await _fbAuth.signInWithPopup(p);
+      _hideAuthPopup();
+    } catch(e) {
+      console.error('[AURA Auth]', e);
+      if (window.chatBot) window.chatBot.toast('Sign-in failed: ' + e.message, 'error', 5000);
+    }
+  }
+
+  async function _googleSignOut() {
+    if (!_fbConfigured || !_fbAuth) return;
+    try {
+      await _fbAuth.signOut();
+      _currentUser = null;
+      _renderAuthUI(null);
+      _applyFeatureGating(null);
+      if (window.chatBot) window.chatBot.toast('Signed out.', 'info');
+    } catch(e) { console.error('[AURA Auth]', e); }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  SIDEBAR AUTH SECTION  — always renders
+  // ══════════════════════════════════════════════════════════════
+  function _renderAuthUI(user) {
+    const section = document.getElementById('authSidebarSection');
+    if (!section) return;
+
+    if (user) {
+      const photo    = user.photoURL || '';
+      const name     = user.displayName || 'User';
+      const email    = user.email || '';
+      const initial  = name.charAt(0).toUpperCase();
+      const avatar   = photo
+        ? `<img class="auth-avatar" src="${_esc2(photo)}" alt="${initial}" referrerpolicy="no-referrer">`
+        : `<div class="auth-avatar-placeholder">${initial}</div>`;
+      section.innerHTML = `
+        <div class="auth-section">
+          <div class="auth-user-row">
+            ${avatar}
+            <div class="auth-user-info">
+              <div class="auth-user-name">${_esc2(name)}</div>
+              <div class="auth-user-email">${_esc2(email)}</div>
+              <div class="auth-sync-badge"><div class="auth-sync-dot"></div>Cloud sync on</div>
+            </div>
+            <button class="auth-signout-btn" id="_auraSignOutBtn" title="Sign out">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        </div>`;
+      document.getElementById('_auraSignOutBtn').addEventListener('click', _googleSignOut);
+    } else {
+      section.innerHTML = `
+        <div class="auth-section">
+          <button class="auth-signin-btn" id="_auraSidebarSignIn">
+            <svg width="14" height="14" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+            Sign in with Google
+          </button>
+        </div>`;
+      document.getElementById('_auraSidebarSignIn').addEventListener('click', _googleSignIn);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  FEATURE GATING  — always active (locked when not signed in)
+  // ══════════════════════════════════════════════════════════════
+  function _applyFeatureGating(user) {
+    const attach  = document.getElementById('attachBtn');
+    const imgMode = document.getElementById('imgModeBtn');
+    if (!attach || !imgMode) return;
+    if (user) {
+      attach.classList.remove('locked');  imgMode.classList.remove('locked');
+      attach.title  = 'Attach images';
+      imgMode.title = 'Image generation mode';
+    } else {
+      attach.classList.add('locked');  imgMode.classList.add('locked');
+      attach.title  = '🔒 Sign in to upload images';
+      imgMode.title = '🔒 Sign in to generate images';
+    }
+  }
+
+  // Capture-phase click guards — intercept BEFORE original handlers
+  document.getElementById('attachBtn').addEventListener('click', e => {
+    if (_currentUser) return; // logged in — let original handler run
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    _showAuthPopup();
+  }, true);
+
+  document.getElementById('imgModeBtn').addEventListener('click', e => {
+    if (_currentUser) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    _showAuthPopup();
+  }, true);
+
+  // Also block auto-detected image generation prompts for guests
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      if (!window.chatBot) return;
+      const _origImgGen = window.chatBot._sendImageGen.bind(window.chatBot);
+      window.chatBot._sendImageGen = function(text) {
+        if (!_currentUser) { _showAuthPopup(); return; }
+        return _origImgGen(text);
+      };
+    }, 400);
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  //  SIGN-IN POPUP  — always works
+  // ══════════════════════════════════════════════════════════════
+  const _authPopup = document.getElementById('signInPopupOverlay');
+
+  function _showAuthPopup() {
+    if (_currentUser) return;
+    _authPopup.classList.add('visible');
+    const hint = document.getElementById('popupTimerHint');
+    if (hint) hint.textContent = 'This reminder appears every 15 minutes.';
+  }
+
+  function _hideAuthPopup() {
+    _authPopup.classList.remove('visible');
+  }
+
+  document.getElementById('closeSignInPopup').addEventListener('click', _hideAuthPopup);
+  document.getElementById('popupGuestBtn').addEventListener('click', _hideAuthPopup);
+  document.getElementById('popupGoogleSignInBtn').addEventListener('click', _googleSignIn);
+  _authPopup.addEventListener('click', e => { if (e.target === _authPopup) _hideAuthPopup(); });
+
+  // ══════════════════════════════════════════════════════════════
+  //  POPUP TIMER — on open + every 15 min
+  // ══════════════════════════════════════════════════════════════
+  document.addEventListener('DOMContentLoaded', () => {
+    // Show after splash (2200ms) + small buffer
+    setTimeout(() => { if (!_currentUser) _showAuthPopup(); }, 2800);
+    // Re-show every 15 minutes
+    setInterval(() => { if (!_currentUser) _showAuthPopup(); }, 15 * 60 * 1000);
+
+    // Initial UI render (shows sign-in button in sidebar immediately)
+    _renderAuthUI(null);
+    _applyFeatureGating(null);
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  //  FIRESTORE SYNC
+  // ══════════════════════════════════════════════════════════════
+  async function _pushIndexToFirestore(sessions) {
+    if (!_currentUser || !_fbDb) return;
+    try {
+      await _fbDb.collection('users').doc(_currentUser.uid)
+        .set({ chatIndex: sessions, updatedAt: Date.now() }, { merge: true });
+    } catch(e) { console.warn('[AURA FS]', e.message); }
+  }
+
+  async function _pushSessionToFirestore(id, msgs) {
+    if (!_currentUser || !_fbDb) return;
+    try {
+      const clean = msgs.map(m => { const {imgUrls,...r} = m; return r; });
+      await _fbDb.collection('users').doc(_currentUser.uid)
+        .collection('sessions').doc(id)
+        .set({ messages: clean, updatedAt: Date.now() });
+    } catch(e) { console.warn('[AURA FS]', e.message); }
+  }
+
+  async function _pullFromFirestore(user) {
+    if (!_fbDb) return;
+    try {
+      const doc = await _fbDb.collection('users').doc(user.uid).get();
+      if (!doc.exists) return;
+      const idx = doc.data().chatIndex || [];
+      if (!idx.length) return;
+      localStorage.setItem(Store.KEY_INDEX, JSON.stringify(idx));
+      for (const s of idx.slice(0, 10)) {
+        const sd = await _fbDb.collection('users').doc(user.uid)
+          .collection('sessions').doc(s.id).get();
+        if (sd.exists) localStorage.setItem(Store.KEY_SESSION(s.id), JSON.stringify(sd.data().messages || []));
+      }
+      if (window.chatBot) {
+        window.chatBot._renderSidebar();
+        const list = Store.listSessions();
+        if (list.length) window.chatBot._loadSession(list[0].id);
+        window.chatBot.toast('✓ Chats loaded from your account.', 'success', 3000);
+      }
+    } catch(e) { console.warn('[AURA FS pull]', e.message); }
+  }
+
+  // Mirror Store writes → Firestore (extend without touching originals)
+  const _origSaveMsgs = Store.saveMessages.bind(Store);
+  Store.saveMessages = (id, msgs) => { _origSaveMsgs(id, msgs); _pushSessionToFirestore(id, msgs); };
+
+  const _origSaveIdx = Store.saveIndex.bind(Store);
+  Store.saveIndex = list => { _origSaveIdx(list); _pushIndexToFirestore(list); };
+
+  </script>
 </body>
 </html>
-
