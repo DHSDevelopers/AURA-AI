@@ -961,20 +961,19 @@
   </script>
 
   <!-- =====================================================
-       FIREBASE AUTH + FIRESTORE SYNC
-       UI always visible. Only SDK calls gated on config.
+       FIREBASE AUTH + FIRESTORE SYNC  ← FIXED SECTION
+       Only changes made here — nothing above is touched.
   ===================================================== -->
   <script>
   'use strict';
 
   // ╔══════════════════════════════════════════════════════════════╗
-  // ║  Paste your Firebase config here.                            ║
-  // ║  Console → Project Settings → Your apps → </> Web           ║
+  // ║  Firebase config — projectId was "YOUR_PROJECT", now fixed  ║
   // ╚══════════════════════════════════════════════════════════════╝
   const _fbConfig = {
     apiKey:            "AIzaSyB0Wq4PD5dHfGvXvzWtus0KrlUHlRS-IxA",
     authDomain:        "aura-ai-fe8dc.firebaseapp.com",
-    projectId:         "YOUR_PROJECT",
+    projectId:         "aura-ai-fe8dc",          // ← FIXED (was "YOUR_PROJECT")
     storageBucket:     "aura-ai-fe8dc.firebasestorage.app",
     messagingSenderId: "351800248641",
     appId:             "1:351800248641:web:a099c8e31d7b4f01dcf9c0"
@@ -982,6 +981,7 @@
 
   const _fbConfigured = _fbConfig.apiKey !== "YOUR_API_KEY";
   let _fbAuth = null, _fbDb = null, _currentUser = null;
+  let _syncInProgress = false; // prevent duplicate pulls
 
   function _esc2(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -995,7 +995,10 @@
         _currentUser = user;
         _renderAuthUI(user);
         _applyFeatureGating(user);
-        if (user) _pullFromFirestore(user);
+        if (user) {
+          // Pull all cloud chats when user signs in, then push any local chats they made as guest
+          _pullFromFirestore(user).then(() => _pushAllLocalToFirestore(user));
+        }
       });
     } catch(err) { console.error('[AURA Firebase]', err); }
   }
@@ -1149,27 +1152,26 @@
   //  POPUP TIMER — on open + every 15 min
   // ══════════════════════════════════════════════════════════════
   document.addEventListener('DOMContentLoaded', () => {
-    // Show after splash (2200ms) + small buffer
     setTimeout(() => { if (!_currentUser) _showAuthPopup(); }, 2800);
-    // Re-show every 15 minutes
     setInterval(() => { if (!_currentUser) _showAuthPopup(); }, 15 * 60 * 1000);
-
-    // Initial UI render (shows sign-in button in sidebar immediately)
     _renderAuthUI(null);
     _applyFeatureGating(null);
   });
 
   // ══════════════════════════════════════════════════════════════
-  //  FIRESTORE SYNC
+  //  FIRESTORE SYNC — push index + each session
   // ══════════════════════════════════════════════════════════════
+
+  // Push the chat index (list of session metadata) to Firestore
   async function _pushIndexToFirestore(sessions) {
     if (!_currentUser || !_fbDb) return;
     try {
       await _fbDb.collection('users').doc(_currentUser.uid)
         .set({ chatIndex: sessions, updatedAt: Date.now() }, { merge: true });
-    } catch(e) { console.warn('[AURA FS]', e.message); }
+    } catch(e) { console.warn('[AURA FS index]', e.message); }
   }
 
+  // Push a single session's messages to Firestore
   async function _pushSessionToFirestore(id, msgs) {
     if (!_currentUser || !_fbDb) return;
     try {
@@ -1177,37 +1179,90 @@
       await _fbDb.collection('users').doc(_currentUser.uid)
         .collection('sessions').doc(id)
         .set({ messages: clean, updatedAt: Date.now() });
-    } catch(e) { console.warn('[AURA FS]', e.message); }
+    } catch(e) { console.warn('[AURA FS session]', e.message); }
   }
 
+  // Push ALL local sessions to Firestore (called after sign-in to upload guest chats)
+  async function _pushAllLocalToFirestore(user) {
+    if (!_fbDb || !user) return;
+    try {
+      const sessions = Store.listSessions();
+      if (!sessions.length) return;
+      // Push index
+      await _fbDb.collection('users').doc(user.uid)
+        .set({ chatIndex: sessions, updatedAt: Date.now() }, { merge: true });
+      // Push each session's messages
+      for (const s of sessions) {
+        const msgs = Store.loadMessages(s.id);
+        if (!msgs.length) continue;
+        const clean = msgs.map(m => { const {imgUrls,...r} = m; return r; });
+        await _fbDb.collection('users').doc(user.uid)
+          .collection('sessions').doc(s.id)
+          .set({ messages: clean, updatedAt: Date.now() }, { merge: true });
+      }
+    } catch(e) { console.warn('[AURA FS pushAll]', e.message); }
+  }
+
+  // Pull ALL sessions from Firestore and merge with local (cloud wins for same IDs)
   async function _pullFromFirestore(user) {
-    if (!_fbDb) return;
+    if (!_fbDb || _syncInProgress) return;
+    _syncInProgress = true;
     try {
       const doc = await _fbDb.collection('users').doc(user.uid).get();
-      if (!doc.exists) return;
-      const idx = doc.data().chatIndex || [];
-      if (!idx.length) return;
-      localStorage.setItem(Store.KEY_INDEX, JSON.stringify(idx));
-      for (const s of idx.slice(0, 10)) {
-        const sd = await _fbDb.collection('users').doc(user.uid)
-          .collection('sessions').doc(s.id).get();
-        if (sd.exists) localStorage.setItem(Store.KEY_SESSION(s.id), JSON.stringify(sd.data().messages || []));
-      }
+      if (!doc.exists) { _syncInProgress = false; return; }
+
+      const cloudIndex = doc.data().chatIndex || [];
+      if (!cloudIndex.length) { _syncInProgress = false; return; }
+
+      // Merge cloud index with any local sessions the user may have made as guest
+      const localIndex  = Store.listSessions();
+      const localIds    = new Set(localIndex.map(s => s.id));
+      const cloudIds    = new Set(cloudIndex.map(s => s.id));
+
+      // Build merged index: cloud entries + any local-only entries not yet in cloud
+      const localOnly   = localIndex.filter(s => !cloudIds.has(s.id));
+      const mergedIndex = [...cloudIndex, ...localOnly]
+        .sort((a, b) => b.ts - a.ts)   // newest first
+        .slice(0, 50);
+
+      // Write merged index to localStorage
+      localStorage.setItem(Store.KEY_INDEX, JSON.stringify(mergedIndex));
+
+      // Pull every cloud session into localStorage
+      const sessionDocs = await _fbDb.collection('users').doc(user.uid)
+        .collection('sessions').get();
+
+      sessionDocs.forEach(sd => {
+        const msgs = sd.data().messages || [];
+        localStorage.setItem(Store.KEY_SESSION(sd.id), JSON.stringify(msgs));
+      });
+
+      // Refresh the UI
       if (window.chatBot) {
         window.chatBot._renderSidebar();
         const list = Store.listSessions();
         if (list.length) window.chatBot._loadSession(list[0].id);
-        window.chatBot.toast('✓ Chats loaded from your account.', 'success', 3000);
+        window.chatBot.toast('✓ Chats synced from your account.', 'success', 3000);
       }
-    } catch(e) { console.warn('[AURA FS pull]', e.message); }
+    } catch(e) {
+      console.warn('[AURA FS pull]', e.message);
+    } finally {
+      _syncInProgress = false;
+    }
   }
 
-  // Mirror Store writes → Firestore (extend without touching originals)
+  // ── Mirror every Store write → Firestore in real-time ──────────
   const _origSaveMsgs = Store.saveMessages.bind(Store);
-  Store.saveMessages = (id, msgs) => { _origSaveMsgs(id, msgs); _pushSessionToFirestore(id, msgs); };
+  Store.saveMessages = (id, msgs) => {
+    _origSaveMsgs(id, msgs);
+    _pushSessionToFirestore(id, msgs);   // always push session
+  };
 
   const _origSaveIdx = Store.saveIndex.bind(Store);
-  Store.saveIndex = list => { _origSaveIdx(list); _pushIndexToFirestore(list); };
+  Store.saveIndex = list => {
+    _origSaveIdx(list);
+    _pushIndexToFirestore(list);         // always push index
+  };
 
   </script>
 </body>
