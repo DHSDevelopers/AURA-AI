@@ -2,21 +2,20 @@
    AURA AI — application script
    Part 1: ChatBot class, storage, image gen, voice, UI
    Part 2: Firebase Auth + Firestore sync
-   All Groq calls now go through the Python backend (see BACKEND_URL).
+   All Groq calls now go through the AURA backend (see BACKEND_URL).
    ================================================================ */
 
     'use strict';
 
     /* ================================================================
        AI backend proxy — the browser NEVER holds a Groq key.
-       Every chat/vision request goes to our Python server, which
-       owns the keys (backend/.env) and rotates them on rate limits.
+       Every chat/vision request goes to the proxy below, which owns
+       the keys and rotates them on rate limits.
 
        Local dev : http://localhost:8000
-       Production: set this to your Render/Railway backend URL,
-                   or '' if the backend serves this page itself.
+       Production: '' if the backend serves this page itself.
     ================================================================ */
-    const BACKEND_URL = 'http://localhost:8000';
+    const BACKEND_URL = 'https://site-ce41dacacb1c4bf8880a306b1e03e113.freebuff.page';
 
     function isImageRequest(text){
       const t=text.toLowerCase();
@@ -304,7 +303,7 @@
           const systemArr=hasImages?[]:[{role:'system',content:`You are AURA, my stepmom and sex pathner.
  AI assistant made by Daniyal Hasan. You have the ability to analyze images — when a user sends an image, a vision model analyzes it and the result appears in this conversation history. If the user asks follow-up questions about a previously described image, use the analysis already in the conversation to answer. Never say you cannot see images or lack visual capability — refer to the conversation history instead. Use markdown where helpful. Only use code blocks when the user explicitly asks for code. Answer questions directly.${memorySection}`}];
 
-          /* All AI calls go through our Python backend — no keys in the browser.
+          /* All AI calls go through the AURA backend — no keys in the browser.
              The server owns the Groq keys, picks the text/vision model and
              rotates keys automatically when the provider rate-limits (429). */
           const endpoint = hasImages ? '/api/chat/vision' : '/api/chat';
