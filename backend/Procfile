@@ -1,0 +1,3 @@
+# Render / Railway process definition.
+# Run this from the backend/ directory: set the service's Root Directory to `backend`.
+web: uvicorn main:app --host 0.0.0.0 --port $PORT
