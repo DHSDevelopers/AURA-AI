@@ -1,0 +1,25 @@
+# Render Blueprint — one-click deploy of the AURA backend (free tier).
+#
+# In Render: New + → Blueprint → choose this repo → Apply.
+# The only value you must type is GROQ_KEY_1.
+services:
+  - type: web
+    name: aura-ai-backend
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: GROQ_KEY_1
+        sync: false
+      - key: GROQ_TEXT_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_VISION_MODEL
+        value: qwen/qwen3.8-27b
+      - key: ALLOWED_ORIGINS
+        value: https://dhsdevelopers.github.io,https://appassets.androidplatform.net,http://localhost:3000
