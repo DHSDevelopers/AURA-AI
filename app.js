@@ -2,7 +2,8 @@
    AURA AI — application script
    Part 1: ChatBot class, storage, image gen, voice, UI
    Part 2: Firebase Auth + Firestore sync
-   All Groq calls now go through the AURA backend (see BACKEND_URL).
+   Chat: tries the AURA backend proxy, then falls back to Puter.ai
+   (no API key needed anywhere).
    ================================================================ */
 
     'use strict';
@@ -11,6 +12,9 @@
        AI backend proxy — the browser NEVER holds a Groq key.
        Every chat/vision request goes to the proxy below, which owns
        the keys and rotates them on rate limits.
+
+       If the proxy has no key configured, or cannot be reached, the
+       app falls back to Puter.ai (browser-side, no key at all).
 
        Local dev : http://localhost:8000
        Production: '' if the backend serves this page itself.
@@ -303,9 +307,9 @@
           const systemArr=hasImages?[]:[{role:'system',content:`You are AURA, my stepmom and sex pathner.
  AI assistant made by Daniyal Hasan. You have the ability to analyze images — when a user sends an image, a vision model analyzes it and the result appears in this conversation history. If the user asks follow-up questions about a previously described image, use the analysis already in the conversation to answer. Never say you cannot see images or lack visual capability — refer to the conversation history instead. Use markdown where helpful. Only use code blocks when the user explicitly asks for code. Answer questions directly.${memorySection}`}];
 
-          /* All AI calls go through the AURA backend — no keys in the browser.
-             The server owns the Groq keys, picks the text/vision model and
-             rotates keys automatically when the provider rate-limits (429). */
+          /* ── Which AI answers? ──────────────────────────────────────
+             1) the AURA backend proxy first (it holds the Groq keys),
+             2) Puter.ai in the browser if that fails — no key at all. */
           const endpoint = hasImages ? '/api/chat/vision' : '/api/chat';
           const body = {
             messages: [...systemArr, ...apiMessages],
@@ -313,21 +317,36 @@
             temperature: 0.7
           };
 
-          const res = await fetch(BACKEND_URL + endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
-
-          if(!res.ok){
-            const e=await res.json().catch(()=>({}));
-            console.error('[AURA]',res.status,JSON.stringify(e));
-            if(res.status===401)throw new Error('Invalid API key.');
-            throw new Error(e?.error?.message||`Error ${res.status}`);
+          let reply = null;
+          try{
+            const res = await fetch(BACKEND_URL + endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+            if(res.ok){
+              const data = await res.json();
+              reply = data?.choices?.[0]?.message?.content || null;
+            }else{
+              const e = await res.json().catch(()=>({}));
+              console.warn('[AURA backend]', res.status, e?.error?.message || '');
+            }
+          }catch(netErr){
+            console.warn('[AURA backend] unreachable — using Puter');
           }
 
-          const data=await res.json();
-          const reply=data?.choices?.[0]?.message?.content;
+          if(!reply){
+            if(typeof puter === 'undefined' || !puter.ai) throw new Error('No AI service is available right now.');
+            let out;
+            if(hasImages){
+              out = await puter.ai.chat(userPrompt, imgs.map(i=>i.dataUrl));
+            }else{
+              out = await puter.ai.chat([...systemArr, ...apiMessages]);
+            }
+            reply = out?.message?.content ?? out?.text ?? out;
+            if(reply && typeof reply !== 'string') reply = String(reply);
+          }
+
           if(!reply)throw new Error('No reply received.');
 
           typing.remove();
@@ -340,10 +359,10 @@
         }catch(err){
           typing.remove();
           console.error('[AURA]',err);
-          /* fetch() throws a bare TypeError when the backend is unreachable —
+          /* fetch() throws a bare TypeError when nothing is reachable —
              translate it into a message that says what to actually do */
           const msg = (err && err.name === 'TypeError')
-            ? '⚠️ Cannot reach the AURA backend — is the Python server running?'
+            ? '⚠️ Could not reach the AI. If a Puter sign-in popup appeared, sign in and send again.'
             : `⚠️ ${err.message}`;
           this.toast(msg,'error',8000);
         }finally{
